@@ -6,7 +6,7 @@ import scala.util.parsing.input._
 import com.tmp.lang.ast._
 
 object LangParser extends Parsers {
-  import com.tmp.lang.lexer.Tokens._
+  import com.tmp.lang.lexer.tokens._
 
   override type Elem = LangToken
 
