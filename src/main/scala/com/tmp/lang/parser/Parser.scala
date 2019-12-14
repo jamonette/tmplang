@@ -17,24 +17,21 @@ object LangParser extends Parsers {
     override def rest: Reader[LangToken] = new LangTokenReader(tokens.tail)
   }
 
-  def number: Parser[Number] = accept("number", { case num @ NumberToken(n) => Number(n) })
+  def number: Parser[NumberLiteral] = accept("number", { case num @ NumberToken(n) => NumberLiteral(n) })
 
   def multiply: Parser[Multiply] = MULTIPLY() ^^ (_ => Multiply())
   def add: Parser[Add] = ADD() ^^ (_ => Add())
 
-  def operator: Parser[Operator] = (multiply | add) ^^ (o => o)
+  //def operator: Parser[Operator] = (multiply | add) ^^ (o => o)
 
-  def list: Parser[LList] =
-    (WHITESPACE().? ~ number ~ WHITESPACE().?).* ^^
-      { case instances =>
-        val nums: List[Number] = instances.map(i => i._1._2)
-        LList(nums)
-      }
+//  def list: Parser[ListASTN] =
+//    (WHITESPACE().? ~ number ~ WHITESPACE().?).* ^^
+//      { case instances =>
+//        val nums: List[Number] = instances.map(i => i._1._2)
+//        NonEmptyList(nums)
+//      }
 
-  def expression: Parser[Expression] = OPENPAREN() ~ operator ~ list ~ CLOSEPAREN() ^^ { case _ ~ op ~ lst ~ _ => Expression(op, lst) }
-
-
-  def p(tokens: Seq[LangToken]) = expression(new LangTokenReader(tokens))
+  //def expression: Parser[Expression] = OPENPAREN() ~ multiply ~ list ~ CLOSEPAREN() ^^ { case _ ~ op ~ lst ~ _ =>   }
 
 }
 

@@ -1,53 +1,61 @@
 package com.tmp.lang
 
 import com.tmp.lang.ast._
-import com.tmp.lang.lexer.Lexer
-import com.tmp.lang.parser.LangParser
 
-object Interpreter {
-
-  def computeIt(ast: AST): Int =
-    ast match {
-      case Expression(operator, listNode) =>
-
-        val listvals: Seq[Number] = for {
-          astVal <- listNode.l
-          numOpt = astVal match {
-            case n: Number => Some(n)
-            case _ => None
-          }
-          num <- numOpt
-        } yield num 
-
-        operator match {
-          case Multiply() => listvals.map(_.n).reduce((n1, n2) => n1 * n2)
-          case Add() => listvals.map(_.n).reduce((n1, n2) => n1 + n2)
-          case _ => -1
-        }
-
-      case _ =>
-        println("Bad AST, todo: exhaustive match + monadic EH") 
-        -1
-    }
-
-}
-
-// clean up clean up everybody
-
-import scala.util.Success
 object Lang extends App {
 
-  val p1 =
-    """(+
-        (*
-          (+ 4 9)))"""
+  import com.tmp.lang.ast.AstImplicits._
 
-  val p2 = "(+ 1 2 3 4 5 6)"
+  val exampleProgramString =
+    """
+      (with msg0 "it equals zero"
+        (with msg1 "it doesn't equal zero"
+          (with test-vals (1 2 3)
+            (with is-zero
+              (func input-values
+                (with i (first input-values)
+                  (insert
+                    (call is-zero (rest input-values))
+                    (if (= i 0)
+                      msg0
+                      msg1)))))))
+              (call is-zero test-vals))
+    """
+  val simpleProgram =
+    With(
+      Symbol("func-1"),
+      FunctionDef(
+        Symbol("input-var"),
+        NonEmptyListASTN(List(
+          Add(),
+          NumberLiteral(5),
+          SymbolDeref(Symbol("input-var"))))),
+      FunctionCall(SymbolDeref(Symbol("func-1")), NumberLiteral(10)))
 
-  val tokens = Lexer.run(p2)
-  val ast = LangParser.p(tokens).get
-  val r = Interpreter.computeIt(ast)
-  println(ast + "\n-----\n" + r)
+
+  val exampleProgramAst =
+    With(Symbol("msg0"), StringLiteral("it equals zero"),
+      With(Symbol("msg1"), StringLiteral("it doesn't equal zero"),
+        With(Symbol("test-vals"), NonEmptyListASTN(List(NumberLiteral(1), NumberLiteral(2), NumberLiteral(3))),
+          With(Symbol("is-zero"),
+            FunctionDef(Symbol("input-values"),
+              With(Symbol("i"), First(SymbolDeref(Symbol("input-values"))),
+                Insert(
+                  FunctionCall(SymbolDeref(Symbol("is-zero")), Rest(SymbolDeref(Symbol("input-values")))),
+                  If(
+                    NonEmptyListASTN(List(
+                      Equals(),
+                      SymbolDeref(Symbol("i")),
+                      NumberLiteral(0))),
+                    SymbolDeref(Symbol("msg0")),
+                    SymbolDeref(Symbol("msg1")))))),
+      FunctionCall(SymbolDeref(Symbol("is-zero")), SymbolDeref(Symbol("test-vals")))))))
+
+
+  
+  println(Interpreter.run(simpleProgram))
+  //println(Interpreter.run(exampleProgramAst))
+
 }
 
 

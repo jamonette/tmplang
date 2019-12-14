@@ -8,9 +8,12 @@ ThisBuild / organizationName := "example"
 lazy val root = (project in file("."))
   .settings(
     name := "tmplang",
+    scalacOptions ++= Seq("-feature"), // "-Xlog-implicits"
     libraryDependencies ++= Seq(
       scalaTest % Test,
-      "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.2")
+      "org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.2",
+      "org.typelevel" %% "cats-core" % "2.0.0",
+      "org.typelevel" %% "cats-mtl-core" % "0.7.0")
   )
 
 // See https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html for instructions on how to publish to Sonatype.
