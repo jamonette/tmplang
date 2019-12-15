@@ -1,10 +1,12 @@
-package com.tmp.lang.lexer
+package com.jamonette.tmplang.lexer
+
+import com.jamonette.tmplang.lexer.tokens._
 
 import scala.util.parsing.combinator.RegexParsers
 
-object Lexer extends RegexParsers {
+// Work in progress, lexer and parser not yet implemented
 
-  import com.tmp.lang.lexer.tokens._
+object Lexer extends RegexParsers {
 
   def number: Parser[NumberToken] = { """0|[1-9]\d*""".r ^^ { n => NumberToken(n.toInt) } }
   def multiply: Parser[MULTIPLY] = { "\\*".r ^^ { _ => MULTIPLY() }}

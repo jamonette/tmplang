@@ -1,12 +1,14 @@
-package com.tmp.lang.parser
+package com.jamonette.tmplang.parser
 
-import scala.util.parsing._
+import com.jamonette.tmplang.ast._
+import com.jamonette.tmplang.lexer.tokens._
+
 import scala.util.parsing.combinator._
 import scala.util.parsing.input._
-import com.tmp.lang.ast._
+
+// Work in progress, lexer and parser not yet implemented
 
 object LangParser extends Parsers {
-  import com.tmp.lang.lexer.tokens._
 
   override type Elem = LangToken
 
@@ -18,20 +20,8 @@ object LangParser extends Parsers {
   }
 
   def number: Parser[NumberLiteral] = accept("number", { case num @ NumberToken(n) => NumberLiteral(n) })
-
   def multiply: Parser[Multiply] = MULTIPLY() ^^ (_ => Multiply())
   def add: Parser[Add] = ADD() ^^ (_ => Add())
-
-  //def operator: Parser[Operator] = (multiply | add) ^^ (o => o)
-
-//  def list: Parser[ListASTN] =
-//    (WHITESPACE().? ~ number ~ WHITESPACE().?).* ^^
-//      { case instances =>
-//        val nums: List[Number] = instances.map(i => i._1._2)
-//        NonEmptyList(nums)
-//      }
-
-  //def expression: Parser[Expression] = OPENPAREN() ~ multiply ~ list ~ CLOSEPAREN() ^^ { case _ ~ op ~ lst ~ _ =>   }
 
 }
 

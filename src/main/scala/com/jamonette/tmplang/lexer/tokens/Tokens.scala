@@ -1,4 +1,6 @@
-package com.tmp.lang.lexer.tokens
+package com.jamonette.tmplang.lexer.tokens
+
+// Work in progress, lexer and parser not yet implemented
 
 sealed trait LangToken
 case class NumberToken(n: Int) extends LangToken
