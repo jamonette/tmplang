@@ -32,10 +32,10 @@ case class EvaluatedList(items: Seq[Expression]) extends Expression
 ///// Value types /////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-sealed trait BooleanValue extends Value
-
 case class NumberLiteral(n: Int) extends Value
 case class StringLiteral(s: String) extends Value
+
+sealed trait BooleanValue extends Value
 case class True() extends BooleanValue
 case class False() extends BooleanValue
 

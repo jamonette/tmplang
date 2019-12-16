@@ -7,8 +7,8 @@ import cats.implicits._
 import com.jamonette.tmplang.ast._
 
 trait RuntimeError
-case class ReferenceError(refName: String) extends RuntimeError
 case class InterpreterError(msg: String) extends RuntimeError
+case class ReferenceError(msg: String) extends RuntimeError
 case class TypeError(msg: String) extends RuntimeError
 
 object Interpreter {
@@ -129,54 +129,44 @@ object Interpreter {
         ///// Numerical operators /////////////////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////////////////////////////
 
-        case op: NumericalOperator =>
-          val total = op match {
-            case Add() => applyNumericOperatorToList((a, b) => a + b, list)
-            case Multiply() => applyNumericOperatorToList((a, b) => a * b, list)
-            case Subtract() => applyNumericOperatorToList((a, b) => a - b, list)
-            case Divide() =>  applyNumericOperatorToList((a, b) => a / b, list) // TODO handle div0
-          }
-
-          EitherT.fromEither(total)
+        case Add() => applyNumericOperatorToList((a, b) => a + b, list)
+        case Multiply() => applyNumericOperatorToList((a, b) => a * b, list)
+        case Subtract() => applyNumericOperatorToList((a, b) => a - b, list)
+        case Divide() =>  applyNumericOperatorToList((a, b) => a / b, list) // TODO handle div0
 
         ///////////////////////////////////////////////////////////////////////////////////////////
         ///// Comparison operators ///////////////////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////////////////////////
 
-        case op: ComparisonOperator =>
-          op match {
-            case op: Equals =>
-              // TODO: unsafe, will throw exception on list len < 2
-              val allListItemsEqual =
-                list.sliding(2, 1).toList
-                  .map(pair => compareExpressions(pair.head, pair.last) == 0)
-                  .reduce((a, b) => a && b)
+        case op: Equals =>
 
-              val result = if (allListItemsEqual) True() else False()
-              EitherT.rightT(result)
-          }
+          // TODO: unsafe, will throw exception on list len < 2
+          val allListItemsEqual =
+            list.sliding(2, 1).toList
+              .map(pair => compareExpressions(pair.head, pair.last) == 0)
+              .reduce((a, b) => a && b)
+
+          val result = if (allListItemsEqual) True() else False()
+          EitherT.rightT(result)
 
         ///////////////////////////////////////////////////////////////////////////////////////////
         ///// List operators /////////////////////////////////////////////////////////////////////
         /////////////////////////////////////////////////////////////////////////////////////////
 
-        case op: ListOperator =>
-          op match {
-            case First() =>
-              list match {
-                case EvaluatedList(x) :: Nil => EitherT.rightT(x.head) // TODO will throw on empty list
-                case _ => EitherT.leftT(TypeError("'First' takes exactly one list as an argument"))
-              }
-            case Rest() =>
-              list match {
-                case EvaluatedList(x) :: Nil => EitherT.rightT(EvaluatedList(x.tail))
-                case _ => EitherT.leftT(TypeError("'Rest' takes exactly one list as an argument"))
-              }
-            case Concat() =>
-              list match {
-                case EvaluatedList(l1) :: EvaluatedList(l2) :: Nil => EitherT.rightT(EvaluatedList(l1 ++ l2))
-                case _ => EitherT.leftT(TypeError("'Concat' takes exactly two lists as arguments"))
-              }
+        case First() =>
+          list match {
+            case EvaluatedList(x) :: Nil => EitherT.rightT(x.head) // TODO will throw on empty list
+            case _ => EitherT.leftT(TypeError("'First' takes exactly one list as an argument"))
+          }
+        case Rest() =>
+          list match {
+            case EvaluatedList(x) :: Nil => EitherT.rightT(EvaluatedList(x.tail))
+            case _ => EitherT.leftT(TypeError("'Rest' takes exactly one list as an argument"))
+          }
+        case Concat() =>
+          list match {
+            case EvaluatedList(l1) :: EvaluatedList(l2) :: Nil => EitherT.rightT(EvaluatedList(l1 ++ l2))
+            case _ => EitherT.leftT(TypeError("'Concat' takes exactly two lists as arguments"))
           }
 
       }): RuntimeMonad[Expression]
@@ -184,7 +174,7 @@ object Interpreter {
 
   private def applyNumericOperatorToList(
     operatorFunc: (Int, Int) => Int,
-    operands: Seq[Expression]): Either[TypeError, Expression] = {
+    operands: Seq[Expression]): RuntimeMonad[Expression] = {
 
     val numberLiterals: Seq[Option[NumberLiteral]] = operands.map {
       case n: NumberLiteral => Some(n)
@@ -193,10 +183,10 @@ object Interpreter {
 
     if (numberLiterals.contains(None)) {
       val err = TypeError("Invalid input for binary numerical operator: " + operands.map(_.toString))
-      Left(err)
+      EitherT.fromEither(Left(err))
     } else {
       val total = numberLiterals.flatten.map(_.n).reduce((a, b) => operatorFunc(a, b))
-      Right(NumberLiteral(total))
+      EitherT.fromEither(Right(NumberLiteral(total)))
     }
   }
 
