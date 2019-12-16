@@ -6,7 +6,6 @@ sealed trait Expression extends ExpressionOrSpecialForm with ExpressionOrReferen
 sealed trait SpecialForm extends ExpressionOrSpecialForm
 
 sealed trait Value extends Expression
-sealed trait BooleanValue extends Value
 sealed trait Operator extends Expression
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -14,10 +13,10 @@ sealed trait Operator extends Expression
 //////////////////////////////////////////////////////////////////////////////////////////
 
 case class Let(variable: VariableDefinition, valueToBind: ExpressionOrSpecialForm, toEvaluate: ExpressionOrSpecialForm) extends SpecialForm
-case class FunctionCall(function: FunctionDef, argument: ExpressionOrSpecialForm) extends SpecialForm
+case class FunctionCall(function: ExpressionOrSpecialForm, argument: ExpressionOrSpecialForm) extends SpecialForm
 case class If(condition: ExpressionOrSpecialForm, ifTrue: ExpressionOrSpecialForm, ifFalse: ExpressionOrSpecialForm) extends SpecialForm
 case class VariableReference(variableName: String) extends SpecialForm
-case class OperatorCall(operator: Operator, list: UnevaluatedList) extends SpecialForm
+case class OperatorCall(operator: Operator, list: ExpressionOrSpecialForm) extends SpecialForm
 
 case class FunctionDef(formalParameter: VariableDefinition, functionBody: ExpressionOrSpecialForm) extends Expression
 case class VariableDefinition(variableName: String)
@@ -32,6 +31,8 @@ case class EvaluatedList(items: Seq[Expression]) extends Expression
 ////////////////////////////////////////////////////////////////////////////////////////////
 ///// Value types /////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
+
+sealed trait BooleanValue extends Value
 
 case class NumberLiteral(n: Int) extends Value
 case class StringLiteral(s: String) extends Value

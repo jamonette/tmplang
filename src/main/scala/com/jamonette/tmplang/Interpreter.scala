@@ -59,12 +59,19 @@ object Interpreter {
       // evaluate the function argument
       argumentValue <- eval(functionCall.argument)
 
+      functionDefExpression <- eval(functionCall.function)
+      functionDef <-
+        (functionDefExpression match {
+          case f: FunctionDef => EitherT.rightT(f)
+          case _ => EitherT.fromEither(Left(TypeError("Function call must refer to a function definition")))
+        }): RuntimeMonad[FunctionDef]
+
       // bind the function argument to a variable with
       // the name of the functions formal parameter
-      _ <- addToSymbolTable(functionCall.function.formalParameter.variableName, argumentValue)
+      _ <- addToSymbolTable(functionDef.formalParameter.variableName, argumentValue)
 
       // evaluate the function body in the new environment
-      result <- eval(functionCall.function.functionBody)
+      result <- eval(functionDef.functionBody)
     } yield result
 
   private def addToSymbolTable(variableName: String, value: ExpressionOrReference): RuntimeMonad[Unit] =
@@ -91,6 +98,7 @@ object Interpreter {
           case _ => false
         }
       branchEvalCall = if (isTrue) eval(ifForm.ifTrue) else eval(ifForm.ifFalse)
+
       result <- branchEvalCall
     } yield result
 
@@ -108,8 +116,12 @@ object Interpreter {
 
   private def evalOperatorCall(operatorCall: OperatorCall): RuntimeMonad[Expression] =
     for {
-      listNode <- evalList(operatorCall.list)
-      list = listNode.items
+      opCallArgumentExpression <- eval(operatorCall.list)
+      list <- (opCallArgumentExpression match {
+        case l: EvaluatedList => EitherT.rightT(l.items)
+        case _ => EitherT.leftT(TypeError("Operator takes exactly one list as an argument"))
+      }): RuntimeMonad[Seq[Expression]]
+
       result <-
       (operatorCall.operator match {
 
@@ -152,19 +164,17 @@ object Interpreter {
           op match {
             case First() =>
               list match {
-                case x :: xs => EitherT.rightT(x)
-                case _ => EitherT.leftT(TypeError("Can't get 'First' of empty list"))
+                case EvaluatedList(x) :: Nil => EitherT.rightT(x.head) // TODO will throw on empty list
+                case _ => EitherT.leftT(TypeError("'First' takes exactly one list as an argument"))
               }
             case Rest() =>
               list match {
-                case x :: xs => EitherT.rightT(EvaluatedList(list.tail))
-                case _ => EitherT.leftT(TypeError("Can't get 'Rest' of empty list"))
+                case EvaluatedList(x) :: Nil => EitherT.rightT(EvaluatedList(x.tail))
+                case _ => EitherT.leftT(TypeError("'Rest' takes exactly one list as an argument"))
               }
             case Concat() =>
               list match {
-                // at this point we know that any sub-lists will not have been evaluated,
-                // so matching this way is safe
-                case UnevaluatedList(l1) :: UnevaluatedList(l2) :: Nil => EitherT.rightT(UnevaluatedList(l1 ++ l2))
+                case EvaluatedList(l1) :: EvaluatedList(l2) :: Nil => EitherT.rightT(EvaluatedList(l1 ++ l2))
                 case _ => EitherT.leftT(TypeError("'Concat' takes exactly two lists as arguments"))
               }
           }
@@ -199,6 +209,7 @@ object Interpreter {
       case (True(), False()) => 1
       case (False(), True()) => -1
       case (StringLiteral(a), StringLiteral(b)) => a.compareTo(b)
+      case (e1, e2) => if (e1 == e2) 0 else -1
       case _ => 0
     }
 }
