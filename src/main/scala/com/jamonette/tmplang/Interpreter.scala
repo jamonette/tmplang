@@ -16,10 +16,10 @@ object Interpreter {
   type RuntimeStateMonad[A] = State[RuntimeEnvironment, A]
   type RuntimeMonad[A] = EitherT[RuntimeStateMonad, RuntimeError, A]
 
-  case class RuntimeEnvironment(symbolTable: Map[String, ExpressionOrReference])
+  case class RuntimeEnvironment(stack: Vector[Map[String, ExpressionOrReference]], globals: Map[String, ExpressionOrReference])
 
   def run(expression: ExpressionOrSpecialForm): Either[RuntimeError, Expression] = {
-    val initialState = RuntimeEnvironment(Map())
+    val initialState = RuntimeEnvironment(Vector(Map()), Map())
     val evalStep: RuntimeMonad[Expression] = eval(expression)
     val (finalState, result) = evalStep.value.run(initialState).value
     result
@@ -43,7 +43,7 @@ object Interpreter {
     for {
       environment <- EitherT.right(State.get[RuntimeEnvironment])
       value <-
-        (environment.symbolTable.get(variableReference.variableName) match {
+        (environment.stack.head.get(variableReference.variableName) match {
           case Some(value) => EitherT.rightT(value)
           case None => EitherT.leftT(ReferenceError("Unable to dereference variable with name: " + variableReference.variableName))
         }): RuntimeMonad[ExpressionOrReference]
@@ -66,19 +66,32 @@ object Interpreter {
           case _ => EitherT.fromEither(Left(TypeError("Function call must refer to a function definition")))
         }): RuntimeMonad[FunctionDef]
 
+      // create a new stack frame
+      preCallEnvironment <- EitherT.right(State.get[RuntimeEnvironment])
+      stackWithNewFrame = preCallEnvironment.stack.prepended(preCallEnvironment.stack.head)
+      envWithNewStack = preCallEnvironment.copy(stack = stackWithNewFrame)
+      _ <- EitherT.right(State.set(envWithNewStack))
+
       // bind the function argument to a variable with
       // the name of the functions formal parameter
       _ <- addToSymbolTable(functionDef.formalParameter.variableName, argumentValue)
 
       // evaluate the function body in the new environment
       result <- eval(functionDef.functionBody)
+
+      // pop frame
+      postCallEnvironment <- EitherT.right(State.get[RuntimeEnvironment])
+      envWithPoppedStack = postCallEnvironment.copy(stack = postCallEnvironment.stack.tail)
+      _ <- EitherT.right(State.set(envWithPoppedStack))
     } yield result
 
   private def addToSymbolTable(variableName: String, value: ExpressionOrReference): RuntimeMonad[Unit] =
     for {
       environment <- EitherT.right(State.get[RuntimeEnvironment])
-      newSymbolTable = environment.symbolTable + ((variableName, value))
-      newEnvironment = environment.copy(symbolTable = newSymbolTable)
+      currentStackFrame = environment.stack.head
+      updatedFrame = currentStackFrame + ((variableName, value))
+      newStack = environment.stack.tail.prepended(updatedFrame)
+      newEnvironment = environment.copy(stack = newStack)
       _ <- EitherT.right(State.set(newEnvironment))
     } yield ()
 

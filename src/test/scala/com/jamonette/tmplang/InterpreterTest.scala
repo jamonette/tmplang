@@ -26,7 +26,7 @@ class InterpreterTest extends FunSuite {
     val ast =
       Let(VariableDefinition("msg0"), StringLiteral("it equals zero"),
         Let(VariableDefinition("msg1"), StringLiteral("it doesn't equal zero"),
-          Let(VariableDefinition("test-vals"), UnevaluatedList(List(NumberLiteral(1), NumberLiteral(0), NumberLiteral(3), NumberLiteral(4))),
+          Let(VariableDefinition("test-vals"), UnevaluatedList(List(NumberLiteral(1), NumberLiteral(0), NumberLiteral(3), NumberLiteral(0))),
             // bind function to name 'is-zero'
             Let(VariableDefinition("is-zero"),
               FunctionDef(VariableDefinition("input-values"),
@@ -46,8 +46,8 @@ class InterpreterTest extends FunSuite {
 
 
     val result = Interpreter.run(ast)
-    //assert(result.toOption.get ===
-    //:  UnevaluatedList(List(StringLiteral("it doesn't equal zero"), StringLiteral("it equals zero"), StringLiteral("it doesn't equal zero"), StringLiteral("it equals zero"))))
+    assert(result.toOption.get ===
+      EvaluatedList(List(StringLiteral("it doesn't equal zero"), StringLiteral("it equals zero"), StringLiteral("it doesn't equal zero"), StringLiteral("it equals zero"))))
   }
 
   test("Operator: Numerical: Add") {
