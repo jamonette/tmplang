@@ -12,10 +12,10 @@ case class ReferenceError(msg: String) extends RuntimeError
 case class TypeError(msg: String) extends RuntimeError
 
 sealed trait Result
-case class FunctionDefResult(functionDef: FunctionDef) extends Result
 case class ListResult(items: List[Result]) extends Result
 case class OperatorResult(operator: Operator) extends Result
 case class ValueResult(value: Value) extends Result
+case class FunctionDefResult(functionDef: FunctionDef, lexicalEnvironment: Map[String, Result]) extends Result
 
 object Interpreter {
 
@@ -23,10 +23,12 @@ object Interpreter {
   type RuntimeMonad[A] = EitherT[RuntimeStateMonad, RuntimeError, A]
 
   // TODO: add globals
-  case class RuntimeEnvironment(stack: Vector[Map[String, Result]])
+  case class RuntimeEnvironment(
+    stack: Vector[Map[String, Result]],
+    lexicalEnvironment: Map[String, Result])
 
   def run(expression: ExpressionOrSpecialForm): Either[RuntimeError, Result] = {
-    val initialState = RuntimeEnvironment(Vector(Map()))
+    val initialState = RuntimeEnvironment(Vector(Map()), Map())
     val evalCall: RuntimeMonad[Result] = eval(expression)
     val (finalState, result) = evalCall.value.run(initialState).value
     result
@@ -40,8 +42,7 @@ object Interpreter {
       case e: OperatorCall => evalOperatorCall(e)
       case e: VariableReference => dereferenceVariable(e)
 
-      // TODO: implement closures
-      case e: FunctionDef => EitherT.rightT(FunctionDefResult(e))
+      case e: FunctionDef => evalFunctionDef(e)
 
       case e: ListType => evalList(e)
       case e: Operator => EitherT.rightT(OperatorResult(e))
@@ -54,30 +55,47 @@ object Interpreter {
       argumentValue <- eval(functionCall.argument)
 
       functionDefExpression <- eval(functionCall.function)
-      functionDef <-
+      functionDefResult <-
         (functionDefExpression match {
-          case FunctionDefResult(f) => EitherT.rightT(f)
+          case fdr: FunctionDefResult => EitherT.rightT(fdr)
           case _ => EitherT.fromEither(Left(TypeError("Function call must refer to a function definition")))
-        }): RuntimeMonad[FunctionDef]
+        }): RuntimeMonad[FunctionDefResult]
 
       // create a new stack frame
       preCallEnvironment <- EitherT.right(State.get[RuntimeEnvironment])
-      stackWithNewFrame = preCallEnvironment.stack.prepended(preCallEnvironment.stack.head)
+
+      // merge closed-over values from the of function definition site into
+      // the current stack frame
+      newStack =
+        functionDefResult.lexicalEnvironment
+          .foldLeft(preCallEnvironment.stack.head)((accum, mapEntry) => accum + mapEntry)
+
+      stackWithNewFrame = preCallEnvironment.stack.prepended(newStack)
       envWithNewStack = preCallEnvironment.copy(stack = stackWithNewFrame)
       _ <- EitherT.right(State.set(envWithNewStack))
 
       // bind the function argument to a variable with
       // the name of the functions formal parameter
-      _ <- addToSymbolTable(functionDef.formalParameter.variableName, argumentValue)
+      _ <- addToSymbolTable(functionDefResult.functionDef.formalParameter.variableName, argumentValue)
 
       // evaluate the function body in the new environment
-      result <- eval(functionDef.functionBody)
+      result <- eval(functionDefResult.functionDef.functionBody)
 
       // pop frame
       postCallEnvironment <- EitherT.right(State.get[RuntimeEnvironment])
       envWithPoppedStack = postCallEnvironment.copy(stack = postCallEnvironment.stack.tail)
       _ <- EitherT.right(State.set(envWithPoppedStack))
     } yield result
+
+  // Store the current stack frame in the FunctionDefResult.
+  // When the function is called, merge any variables stored in the
+  // FunctionDef into the current environment so that they are resolved in
+  // preference to the stack at the call site. Allows for closures.
+  private def evalFunctionDef(functionDef: FunctionDef): RuntimeMonad[Result] =
+    for {
+      environment <- EitherT.right(State.get[RuntimeEnvironment])
+      stackFrame = environment.stack.head
+    } yield FunctionDefResult(functionDef, stackFrame)
 
   private def addToSymbolTable(variableName: String, value: Result): RuntimeMonad[Unit] =
     for {

@@ -78,8 +78,8 @@ class InterpreterTest extends FunSuite {
             FunctionCall(VariableReference("func-generator"), ListType(List())),
             FunctionCall(VariableReference("the-func"), ListType(List())))))
 
-    //val result: Expression = Interpreter.run(ast).toOption.get
-    //assert(result === ListType(List(NumberLiteral(2), StringLiteral("asdf"))))
+    val result: Expression = Interpreter.run(ast).toOption.get
+    assert(result === ListType(List(NumberLiteral(2), StringLiteral("asdf"))))
   }
 
   test("Operator: Numerical: Add") {
