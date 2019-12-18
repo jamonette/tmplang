@@ -1,10 +1,7 @@
 package com.jamonette.tmplang.ast
 
-sealed trait ExpressionOrSpecialForm
-sealed trait ExpressionOrReference
-sealed trait Expression extends ExpressionOrSpecialForm with ExpressionOrReference
+sealed trait Expression extends ExpressionOrSpecialForm
 sealed trait SpecialForm extends ExpressionOrSpecialForm
-
 sealed trait Value extends Expression
 sealed trait Operator extends Expression
 
@@ -12,21 +9,21 @@ sealed trait Operator extends Expression
 ///// Special forms ///////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-case class Let(variable: VariableDefinition, valueToBind: ExpressionOrSpecialForm, toEvaluate: ExpressionOrSpecialForm) extends SpecialForm
 case class FunctionCall(function: ExpressionOrSpecialForm, argument: ExpressionOrSpecialForm) extends SpecialForm
 case class If(condition: ExpressionOrSpecialForm, ifTrue: ExpressionOrSpecialForm, ifFalse: ExpressionOrSpecialForm) extends SpecialForm
-case class VariableReference(variableName: String) extends SpecialForm
-case class OperatorCall(operator: Operator, list: ExpressionOrSpecialForm) extends SpecialForm
+case class Let(variable: VariableDefinition, valueToBind: ExpressionOrSpecialForm, toEvaluate: ExpressionOrSpecialForm) extends SpecialForm
+case class OperatorCall(operator: Operator, list: ListOrReference) extends SpecialForm
+case class VariableReference(variableName: String) extends SpecialForm with ListOrReference
 
-case class FunctionDef(formalParameter: VariableDefinition, functionBody: ExpressionOrSpecialForm) extends Expression
+// REFACTOR: remove
 case class VariableDefinition(variableName: String)
 
 ////////////////////////////////////////////////////////////////////////////////////////////
-///// List types //////////////////////////////////////////////////////////////////////////
+///// Expression types ////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-case class UnevaluatedList(items: Seq[ExpressionOrSpecialForm]) extends Expression
-case class EvaluatedList(items: Seq[Expression]) extends Expression
+case class FunctionDef(formalParameter: VariableDefinition, functionBody: ExpressionOrSpecialForm) extends Expression
+case class ListType(items: Seq[ExpressionOrSpecialForm]) extends Expression with ListOrReference
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 ///// Value types /////////////////////////////////////////////////////////////////////////
@@ -43,10 +40,11 @@ case class False() extends BooleanValue
 ///// Numerical operators /////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
+// NOTE: never add the modulo operator
 sealed trait NumericalOperator extends Operator
-case class Multiply() extends NumericalOperator
 case class Add() extends NumericalOperator
 case class Subtract() extends NumericalOperator
+case class Multiply() extends NumericalOperator
 case class Divide() extends NumericalOperator
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,3 +63,11 @@ case class Concat() extends ListOperator
 sealed trait ComparisonOperator extends Operator
 case class Equals() extends ComparisonOperator
 
+////////////////////////////////////////////////////////////////////////////////////////////
+///// Union types /////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
+
+// REFACTOR: better names for these
+sealed trait ExpressionOrReferenceOrSpecialForm
+sealed trait ExpressionOrSpecialForm extends ExpressionOrReferenceOrSpecialForm
+sealed trait ListOrReference

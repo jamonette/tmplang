@@ -11,50 +11,44 @@ case class InterpreterError(msg: String) extends RuntimeError
 case class ReferenceError(msg: String) extends RuntimeError
 case class TypeError(msg: String) extends RuntimeError
 
+sealed trait Result
+case class FunctionDefResult(functionDef: FunctionDef) extends Result
+case class ListResult(items: List[Result]) extends Result
+case class OperatorResult(operator: Operator) extends Result
+case class ValueResult(value: Value) extends Result
+
 object Interpreter {
 
   type RuntimeStateMonad[A] = State[RuntimeEnvironment, A]
   type RuntimeMonad[A] = EitherT[RuntimeStateMonad, RuntimeError, A]
 
-  case class RuntimeEnvironment(stack: Vector[Map[String, ExpressionOrReference]], globals: Map[String, ExpressionOrReference])
+  // TODO: add globals
+  case class RuntimeEnvironment(stack: Vector[Map[String, Result]])
 
-  def run(expression: ExpressionOrSpecialForm): Either[RuntimeError, Expression] = {
-    val initialState = RuntimeEnvironment(Vector(Map()), Map())
-    val evalStep: RuntimeMonad[Expression] = eval(expression)
-    val (finalState, result) = evalStep.value.run(initialState).value
+  def run(expression: ExpressionOrSpecialForm): Either[RuntimeError, Result] = {
+    val initialState = RuntimeEnvironment(Vector(Map()))
+    val evalCall: RuntimeMonad[Result] = eval(expression)
+    val (finalState, result) = evalCall.value.run(initialState).value
     result
   }
 
-  private def eval(expression: ExpressionOrSpecialForm): RuntimeMonad[Expression] =
+  private def eval(expression: ExpressionOrReferenceOrSpecialForm): RuntimeMonad[Result] =
     expression match {
-      case e: Value => EitherT.rightT(e)
-      case e: Operator => EitherT.rightT(e)
-      case e: UnevaluatedList => evalListAsExpression(e)
-      case e: EvaluatedList => EitherT.rightT(e)
       case e: FunctionCall => evalFunctionCall(e)
-      case e: Let => evalLetBinding(e)
       case e: If => evalIf(e)
-      case e: VariableReference => dereferenceVariable(e)
+      case e: Let => evalLetBinding(e)
       case e: OperatorCall => evalOperatorCall(e)
-      case e: FunctionDef => EitherT.rightT(e)
+      case e: VariableReference => dereferenceVariable(e)
+
+      // TODO: implement closures
+      case e: FunctionDef => EitherT.rightT(FunctionDefResult(e))
+
+      case e: ListType => evalList(e)
+      case e: Operator => EitherT.rightT(OperatorResult(e))
+      case e: Value => EitherT.rightT(ValueResult(e))
     }
 
-  private def dereferenceVariable[T <: Expression](variableReference: VariableReference): RuntimeMonad[Expression] =
-    for {
-      environment <- EitherT.right(State.get[RuntimeEnvironment])
-      value <-
-        (environment.stack.head.get(variableReference.variableName) match {
-          case Some(value) => EitherT.rightT(value)
-          case None => EitherT.leftT(ReferenceError("Unable to dereference variable with name: " + variableReference.variableName))
-        }): RuntimeMonad[ExpressionOrReference]
-      result <-
-        (value match {
-          case r: VariableReference => dereferenceVariable(r)
-          case e: Expression => EitherT.rightT(e)
-        }): RuntimeMonad[Expression]
-    } yield result
-
-  private def evalFunctionCall(functionCall: FunctionCall): RuntimeMonad[Expression] =
+  private def evalFunctionCall(functionCall: FunctionCall): RuntimeMonad[Result] =
     for {
       // evaluate the function argument
       argumentValue <- eval(functionCall.argument)
@@ -62,7 +56,7 @@ object Interpreter {
       functionDefExpression <- eval(functionCall.function)
       functionDef <-
         (functionDefExpression match {
-          case f: FunctionDef => EitherT.rightT(f)
+          case FunctionDefResult(f) => EitherT.rightT(f)
           case _ => EitherT.fromEither(Left(TypeError("Function call must refer to a function definition")))
         }): RuntimeMonad[FunctionDef]
 
@@ -85,7 +79,7 @@ object Interpreter {
       _ <- EitherT.right(State.set(envWithPoppedStack))
     } yield result
 
-  private def addToSymbolTable(variableName: String, value: ExpressionOrReference): RuntimeMonad[Unit] =
+  private def addToSymbolTable(variableName: String, value: Result): RuntimeMonad[Unit] =
     for {
       environment <- EitherT.right(State.get[RuntimeEnvironment])
       currentStackFrame = environment.stack.head
@@ -95,45 +89,36 @@ object Interpreter {
       _ <- EitherT.right(State.set(newEnvironment))
     } yield ()
 
-  private def evalLetBinding(letBinding: Let): RuntimeMonad[Expression] =
+  private def evalIf(ifForm: If): RuntimeMonad[Result] =
+    for {
+      conditionValue <- eval(ifForm.condition)
+      isTrue =
+      conditionValue match {
+        case ValueResult(True()) => true
+        case _ => false
+      }
+      branchEvalCall = if (isTrue) eval(ifForm.ifTrue) else eval(ifForm.ifFalse)
+
+      result <- branchEvalCall
+    } yield result
+
+  private def evalLetBinding(letBinding: Let): RuntimeMonad[Result] =
     for {
       valueToBind <- eval(letBinding.valueToBind)
       _ <- addToSymbolTable(letBinding.variable.variableName, valueToBind)
       result <- eval(letBinding.toEvaluate)
     } yield result
 
-  private def evalIf(ifForm: If): RuntimeMonad[Expression] =
+  private def evalOperatorCall(operatorCall: OperatorCall): RuntimeMonad[Result] =
     for {
-      conditionValue <- eval(ifForm.condition)
-      isTrue =
-        conditionValue match {
-          case True() => true
-          case _ => false
-        }
-      branchEvalCall = if (isTrue) eval(ifForm.ifTrue) else eval(ifForm.ifFalse)
-
-      result <- branchEvalCall
-    } yield result
-
-  private def evalList(list: UnevaluatedList): RuntimeMonad[EvaluatedList] =
-    for {
-      evaldItems <- {
-        val evalCalls: List[RuntimeMonad[Expression]] = list.items.map(i => eval(i)).toList
-        Traverse[List].sequence[RuntimeMonad, Expression](evalCalls): RuntimeMonad[List[Expression]]
+      listValue <- operatorCall.list match {
+        case l: ListType => eval(l)
+        case r: VariableReference => dereferenceVariable(r)
       }
-    } yield EvaluatedList(evaldItems)
-
-  // hack around what I think is a variance issue w/ State type
-  private def evalListAsExpression(list: UnevaluatedList): RuntimeMonad[Expression] =
-    evalList(list).map(evaluatedList => (evaluatedList: Expression))
-
-  private def evalOperatorCall(operatorCall: OperatorCall): RuntimeMonad[Expression] =
-    for {
-      opCallArgumentExpression <- eval(operatorCall.list)
-      list <- (opCallArgumentExpression match {
-        case l: EvaluatedList => EitherT.rightT(l.items)
+      list <- (listValue match {
+        case ListResult(list) => EitherT.rightT(list)
         case _ => EitherT.leftT(TypeError("Operator takes exactly one list as an argument"))
-      }): RuntimeMonad[Seq[Expression]]
+      }): RuntimeMonad[Seq[Result]]
 
       result <-
       (operatorCall.operator match {
@@ -143,9 +128,9 @@ object Interpreter {
         //////////////////////////////////////////////////////////////////////////////////////////
 
         case Add() => applyNumericOperatorToList((a, b) => a + b, list)
-        case Multiply() => applyNumericOperatorToList((a, b) => a * b, list)
         case Subtract() => applyNumericOperatorToList((a, b) => a - b, list)
-        case Divide() =>  applyNumericOperatorToList((a, b) => a / b, list) // TODO handle div0
+        case Multiply() => applyNumericOperatorToList((a, b) => a * b, list)
+        case Divide() => applyNumericOperatorToList((a, b) => a / b, list) // TODO: handle div0
 
         ///////////////////////////////////////////////////////////////////////////////////////////
         ///// Comparison operators ///////////////////////////////////////////////////////////////
@@ -160,7 +145,7 @@ object Interpreter {
               .reduce((a, b) => a && b)
 
           val result = if (allListItemsEqual) True() else False()
-          EitherT.rightT(result)
+          EitherT.rightT(ValueResult(result))
 
         ///////////////////////////////////////////////////////////////////////////////////////////
         ///// List operators /////////////////////////////////////////////////////////////////////
@@ -168,51 +153,74 @@ object Interpreter {
 
         case First() =>
           list match {
-            case EvaluatedList(x) :: Nil => EitherT.rightT(x.head) // TODO will throw on empty list
+            case ListResult(x) :: Nil => EitherT.rightT(x.head) // TODO: will throw on empty list
             case _ => EitherT.leftT(TypeError("'First' takes exactly one list as an argument"))
           }
         case Rest() =>
           list match {
-            case EvaluatedList(x) :: Nil => EitherT.rightT(EvaluatedList(x.tail))
+            case ListResult(x) :: Nil => EitherT.rightT(ListResult(x.tail))
             case _ => EitherT.leftT(TypeError("'Rest' takes exactly one list as an argument"))
           }
         case Concat() =>
           list match {
-            case EvaluatedList(l1) :: EvaluatedList(l2) :: Nil => EitherT.rightT(EvaluatedList(l1 ++ l2))
+            case ListResult(l1) :: ListResult(l2) :: Nil => EitherT.rightT(ListResult(l1 ++ l2))
             case _ => EitherT.leftT(TypeError("'Concat' takes exactly two lists as arguments"))
           }
 
-      }): RuntimeMonad[Expression]
+      }): RuntimeMonad[Result]
     } yield result
 
   private def applyNumericOperatorToList(
     operatorFunc: (Int, Int) => Int,
-    operands: Seq[Expression]): RuntimeMonad[Expression] = {
+    operands: Seq[Result]): RuntimeMonad[Result] = {
 
-    val numberLiterals: Seq[Option[NumberLiteral]] = operands.map {
-      case n: NumberLiteral => Some(n)
+    val numbers: Seq[Option[Int]] = operands.map {
+      case ValueResult(NumberLiteral(n)) => Some(n)
       case _ => None
     }
 
-    if (numberLiterals.contains(None)) {
+    if (numbers.contains(None)) {
       val err = TypeError("Invalid input for binary numerical operator: " + operands.map(_.toString))
-      EitherT.fromEither(Left(err))
+      EitherT.leftT(err)
     } else {
-      val total = numberLiterals.flatten.map(_.n).reduce((a, b) => operatorFunc(a, b))
-      EitherT.fromEither(Right(NumberLiteral(total)))
+      val total = numbers.flatten.reduce((a, b) => operatorFunc(a, b))
+      EitherT.rightT(ValueResult(NumberLiteral(total)))
     }
   }
 
-  private def compareExpressions(e1: Expression, e2: Expression): Int =
-    // TODO: method for testing equality of lists, other types
+  private def compareExpressions(e1: Result, e2: Result): Int =
     (e1, e2) match {
-      case (NumberLiteral(a), NumberLiteral(b)) => a.compareTo(b)
-      case (True(), True()) => 0
-      case (False(), False()) => 0
-      case (True(), False()) => 1
-      case (False(), True()) => -1
-      case (StringLiteral(a), StringLiteral(b)) => a.compareTo(b)
-      case (e1, e2) => if (e1 == e2) 0 else -1
-      case _ => 0
+      case (ValueResult(v1), ValueResult(v2)) =>
+        (v1, v2) match {
+          case (NumberLiteral(a), NumberLiteral(b)) => a.compareTo(b)
+          case (True(), True()) => 0
+          case (False(), False()) => 0
+          case (True(), False()) => 1
+          case (False(), True()) => -1
+          case (StringLiteral(a), StringLiteral(b)) => a.compareTo(b)
+          case _ => -1
+        }
+      case (ListResult(l1), ListResult(l2)) => if (l1 == l2) 0 else -1
+      case _ => -1
     }
+
+  private def dereferenceVariable(variableReference: VariableReference): RuntimeMonad[Result] =
+    for {
+      environment <- EitherT.right(State.get[RuntimeEnvironment])
+      value <-
+        (environment.stack.head.get(variableReference.variableName) match {
+          case Some(value) => EitherT.rightT(value)
+          case None => EitherT.leftT(ReferenceError("Unable to dereference variable with name: " + variableReference.variableName))
+        }): RuntimeMonad[Result]
+    } yield value
+
+  private def evalList(list: ListType): RuntimeMonad[Result] =
+    for {
+      concreteItems <- {
+        val evalCalls: List[RuntimeMonad[Result]] = list.items.map(i => eval(i)).toList
+        Traverse[List].sequence[RuntimeMonad, Result](evalCalls): RuntimeMonad[List[Result]]
+      }
+    } yield ListResult(concreteItems)
+
 }
+
