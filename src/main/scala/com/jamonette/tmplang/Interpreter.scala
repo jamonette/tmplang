@@ -12,10 +12,10 @@ case class ReferenceError(msg: String) extends RuntimeError
 case class TypeError(msg: String) extends RuntimeError
 
 sealed trait Result
+case class FunctionDefResult(functionDef: FunctionDef, lexicalEnvironment: Map[String, Result]) extends Result
 case class ListResult(items: List[Result]) extends Result
 case class OperatorResult(operator: Operator) extends Result
 case class ValueResult(value: Value) extends Result
-case class FunctionDefResult(functionDef: FunctionDef, lexicalEnvironment: Map[String, Result]) extends Result
 
 object Interpreter {
 
@@ -64,13 +64,13 @@ object Interpreter {
       // create a new stack frame
       preCallEnvironment <- EitherT.right(State.get[RuntimeEnvironment])
 
-      // merge closed-over values from the of function definition site into
+      // merge closed-over values from the function definition site into
       // the current stack frame
-      newStack =
+      newFrame =
         functionDefResult.lexicalEnvironment
           .foldLeft(preCallEnvironment.stack.head)((accum, mapEntry) => accum + mapEntry)
 
-      stackWithNewFrame = preCallEnvironment.stack.prepended(newStack)
+      stackWithNewFrame = preCallEnvironment.stack.prepended(newFrame)
       envWithNewStack = preCallEnvironment.copy(stack = stackWithNewFrame)
       _ <- EitherT.right(State.set(envWithNewStack))
 
