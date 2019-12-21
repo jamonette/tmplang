@@ -1,4 +1,4 @@
-package com.jamonette.tmplang.ast
+package com.jamonette.tmplang
 
 sealed trait Expression extends ExpressionOrSpecialForm
 sealed trait SpecialForm extends ExpressionOrSpecialForm
@@ -15,7 +15,6 @@ case class Let(variable: VariableDefinition, valueToBind: ExpressionOrSpecialFor
 case class OperatorCall(operator: Operator, list: ListOrReference) extends SpecialForm
 case class VariableReference(variableName: String) extends SpecialForm with ListOrReference
 
-// REFACTOR: remove
 case class VariableDefinition(variableName: String)
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,7 +22,7 @@ case class VariableDefinition(variableName: String)
 //////////////////////////////////////////////////////////////////////////////////////////
 
 case class FunctionDef(formalParameter: VariableDefinition, functionBody: ExpressionOrSpecialForm) extends Expression
-case class ListType(items: Seq[ExpressionOrSpecialForm]) extends Expression with ListOrReference
+case class ListType(items: Seq[ExpressionOrSpecialFormOrReference]) extends Expression with ListOrReference
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 ///// Value types /////////////////////////////////////////////////////////////////////////
@@ -68,6 +67,6 @@ case class Equals() extends ComparisonOperator
 //////////////////////////////////////////////////////////////////////////////////////////
 
 // REFACTOR: better names for these
-sealed trait ExpressionOrReferenceOrSpecialForm
-sealed trait ExpressionOrSpecialForm extends ExpressionOrReferenceOrSpecialForm
+sealed trait ExpressionOrSpecialFormOrReference
+sealed trait ExpressionOrSpecialForm extends ExpressionOrSpecialFormOrReference
 sealed trait ListOrReference
