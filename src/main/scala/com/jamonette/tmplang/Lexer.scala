@@ -10,7 +10,7 @@ object Lexer extends RegexParsers {
       case Success(result, _) => Right(result)
       case NoSuccess(err, nextToken) =>
         val msg = s"$err occurring at line ${nextToken.pos.line} | col ${nextToken.pos.column}"
-        Left(ParseError(msg))
+        Left(GeneralParseError(msg))
     }
 
   private def openParen: Parser[OPENPAREN] = "\\(".r ^^ { _ => OPENPAREN() }
@@ -20,7 +20,7 @@ object Lexer extends RegexParsers {
   private def functionDef: Parser[FUNCTIONDEF] = Strings.functionDef.r ^^ { _ => FUNCTIONDEF() }
   private def functionCall: Parser[FUNCTIONCALL] = Strings.functionCall.r ^^ { _ => FUNCTIONCALL() }
   private def number: Parser[NumberToken] = """0|[1-9]\d*""".r ^^ { n => NumberToken(n.toInt) }
-  private def string: Parser[StringToken] = """".*"""".r ^^ { s => StringToken(s.substring(1, s.length - 1)) }
+  private def string: Parser[StringToken] = """"[^"]*"""".r ^^ { s => StringToken(s.substring(1, s.length - 1)) }
   private def trueToken: Parser[TRUE] = Strings.trueStr.r ^^ { _ => TRUE() }
   private def falseToken: Parser[FALSE] = Strings.falseStr.r ^^ { _ => FALSE() }
   private def add: Parser[ADD] = """\+""".r ^^ { _ => ADD() }
@@ -60,7 +60,7 @@ object Lexer extends RegexParsers {
       equals
     )) ^^ { t => t }
 
-  object Strings {
+  private object Strings {
     val let = "let"
     val ifStr = "if"
     val functionDef = "function-def"

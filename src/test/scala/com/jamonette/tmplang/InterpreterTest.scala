@@ -9,8 +9,8 @@ class InterpreterTest extends FunSuite {
 
   test("Function call") {
     val ast =
-      Let(VariableDefinition("func-1"),
-        FunctionDef(VariableDefinition("input-var"),
+      Let("func-1",
+        FunctionDef("input-var",
           OperatorCall(Add(), ListType(List(NumberLiteral(5),VariableReference("input-var"))))),
         FunctionCall(VariableReference("func-1"), NumberLiteral(10)))
 
@@ -18,22 +18,22 @@ class InterpreterTest extends FunSuite {
     assert(result === NumberLiteral(15))
   }
 
-  test("Function call: recursive") {
+  test("Function call | recursive") {
     val result = Interpreter.run(ExpressionAST.recursiveCall0).toOption.get.toExpression
     assert(result ===
       ListType(List(StringLiteral("zero"), StringLiteral("not zero"), StringLiteral("not zero"), StringLiteral("zero"), StringLiteral("not zero"), StringLiteral("not zero"))))
   }
 
-  test("Function call: closure") {
+  test("Function call | closure") {
     val ast =
-      Let(VariableDefinition("closed-var-1"), NumberLiteral(1),
-        Let(VariableDefinition("func-generator"),
-          FunctionDef(VariableDefinition("func-generator-args"),
-            Let(VariableDefinition("closed-var-1"), NumberLiteral(2),
-              Let(VariableDefinition("closed-var-2"), StringLiteral("asdf"),
-                FunctionDef(VariableDefinition("the-func-args"),
+      Let("closed-var-1", NumberLiteral(1),
+        Let("func-generator",
+          FunctionDef("func-generator-args",
+            Let("closed-var-1", NumberLiteral(2),
+              Let("closed-var-2", StringLiteral("asdf"),
+                FunctionDef("the-func-args",
                   ListType(List(VariableReference("closed-var-1"), VariableReference("closed-var-2"))))))),
-          Let(VariableDefinition("the-func"),
+          Let("the-func",
             FunctionCall(VariableReference("func-generator"), ListType(List())),
             FunctionCall(VariableReference("the-func"), ListType(List())))))
 
@@ -41,7 +41,7 @@ class InterpreterTest extends FunSuite {
     assert(result === ListType(List(NumberLiteral(2), StringLiteral("asdf"))))
   }
 
-  test("Operator: Numerical: Add") {
+  test("Operator | Numerical | Add") {
     val ast =
       OperatorCall(Add(), ListType(List(NumberLiteral(400), NumberLiteral(300))))
 
@@ -49,9 +49,9 @@ class InterpreterTest extends FunSuite {
     assert(result === NumberLiteral(700))
   }
 
-  test("Operator: On Reference to List") {
+  test("Operator | On Reference to List") {
     val ast =
-      Let(VariableDefinition("the-list"),
+      Let("the-list",
         ListType(List(NumberLiteral(1), NumberLiteral(2))),
         OperatorCall(Add(), VariableReference("the-list")))
 
@@ -59,7 +59,7 @@ class InterpreterTest extends FunSuite {
     assert(result === NumberLiteral(3))
   }
 
-  test("Operator: Equals") {
+  test("Operator | Equals") {
     val ast =
       OperatorCall(Equals(), ListType(List(True(), True())))
 
@@ -67,7 +67,7 @@ class InterpreterTest extends FunSuite {
     assert(result === True())
   }
 
-  test("Operator: Equals 2") {
+  test("Operator | Equals 2") {
     val ast =
       OperatorCall(Equals(), ListType(List(True(), True(), False())))
 
@@ -75,7 +75,7 @@ class InterpreterTest extends FunSuite {
     assert(result === False())
   }
 
-  test("Operator: Equals 3") {
+  test("Operator | Equals 3") {
     val ast =
       OperatorCall(Equals(), ListType(List(NumberLiteral(4), NumberLiteral(5))))
 
@@ -83,7 +83,7 @@ class InterpreterTest extends FunSuite {
     assert(result === False())
   }
 
-  test("Operator: Equals 4") {
+  test("Operator | Equals 4") {
     val ast =
       OperatorCall(Equals(), ListType(List(NumberLiteral(4), NumberLiteral(4))))
 
@@ -91,9 +91,9 @@ class InterpreterTest extends FunSuite {
     assert(result === True())
   }
 
-  test("List Operators: First") {
+  test("List Operators | First") {
     val ast =
-      Let(VariableDefinition("the-list"),
+      Let("the-list",
         ListType(List(NumberLiteral(1), NumberLiteral(2), NumberLiteral(3), NumberLiteral(4), NumberLiteral(5))),
         OperatorCall(First(), ListType(List(VariableReference("the-list")))))
 
@@ -101,9 +101,9 @@ class InterpreterTest extends FunSuite {
     assert(result === NumberLiteral(1))
   }
 
-  test("List Operators: Rest") {
+  test("List Operators | Rest") {
     val ast =
-      Let(VariableDefinition("the-list"),
+      Let("the-list",
         ListType(List(NumberLiteral(1), NumberLiteral(2), NumberLiteral(3), NumberLiteral(4), NumberLiteral(5))),
         OperatorCall(Rest(), ListType(List(VariableReference("the-list")))))
 
@@ -111,11 +111,11 @@ class InterpreterTest extends FunSuite {
     assert(result === ListType(List(NumberLiteral(2), NumberLiteral(3), NumberLiteral(4), NumberLiteral(5))))
   }
 
-  test("List Operators: Concat") {
+  test("List Operators | Concat") {
     val ast =
-      Let(VariableDefinition("list-1"),
+      Let("list-1",
         ListType(List(NumberLiteral(1), NumberLiteral(2), NumberLiteral(3), NumberLiteral(4), NumberLiteral(5))),
-          Let(VariableDefinition("list-2"),
+          Let("list-2",
             ListType(List(StringLiteral("a"), StringLiteral("b"), StringLiteral("c"))),
             OperatorCall(Concat(), ListType(List(VariableReference("list-1"), VariableReference("list-2"))))))
 
@@ -124,9 +124,9 @@ class InterpreterTest extends FunSuite {
       ListType(List(NumberLiteral(1), NumberLiteral(2), NumberLiteral(3), NumberLiteral(4), NumberLiteral(5), StringLiteral("a"), StringLiteral("b"), StringLiteral("c"))))
   }
 
-  test("If: True") {
+  test("If | True") {
     val ast =
-      Let(VariableDefinition("the-comparison-var"), True(),
+      Let("the-comparison-var", True(),
         If(VariableReference("the-comparison-var"),
           StringLiteral("it's true"),
           StringLiteral("it's false")))
@@ -135,9 +135,9 @@ class InterpreterTest extends FunSuite {
     assert(result === StringLiteral("it's true"))
   }
 
-  test("If: False") {
+  test("If | False") {
     val ast =
-      Let(VariableDefinition("the-comparison-var"),
+      Let("the-comparison-var",
         False(),
         If(VariableReference("the-comparison-var"),
           StringLiteral("it's true"),

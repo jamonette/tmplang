@@ -4,8 +4,6 @@ import scala.util.parsing.combinator._
 import scala.util.parsing.input._
 import com.jamonette.tmplang.Tokens._
 
-case class ParseError(msg: String)
-
 object Parser extends Parsers {
 
   override type Elem = Token
@@ -17,13 +15,17 @@ object Parser extends Parsers {
     override def rest: Reader[Token] = new TokenReader(tokens.tail)
   }
 
-  def apply(tokens: Seq[Token]): Either[ParseError, ExpressionOrSpecialForm] =
-    expressionOrSpecialForm(new TokenReader(tokens)) match {
-      case Success(expression, _) => Right(expression)
-      case NoSuccess(err, nextToken) =>
-        val msg = s"$err occurring at line ${nextToken.pos.line} | col ${nextToken.pos.column}"
-        Left(ParseError(msg))
-    }
+  def parse(input: String): Either[ParseError, ExpressionOrSpecialForm] =
+    for {
+      tokens <- Lexer(input)
+      result <-
+        expressionOrSpecialForm(new TokenReader(tokens)) match {
+          case Success(expression, _) => Right(expression)
+          case NoSuccess(err, nextToken) =>
+            val msg = s"$err occurring at line ${nextToken.pos.line} | col ${nextToken.pos.column}"
+            Left(GeneralParseError(msg))
+        }
+    } yield result
 
   private def expressionOrSpecialForm: Parser[ExpressionOrSpecialForm] =
     functionCall | ifParser | let | operatorCall | variableReference | functionDef | list | value | operator
@@ -45,7 +47,7 @@ object Parser extends Parsers {
 
   private def let: Parser[Let] =
     OPENPAREN() ~ LET() ~ variableToken ~ expressionOrSpecialForm ~ expressionOrSpecialForm ~ CLOSEPAREN() ^^ {
-      case _ ~ _ ~ VARIABLE(varName) ~ toBind ~ toEval ~ _ => Let(VariableDefinition(varName), toBind, toEval)
+      case _ ~ _ ~ VARIABLE(varName) ~ toBind ~ toEval ~ _ => Let(varName, toBind, toEval)
     }
 
   private def operatorCall: Parser[OperatorCall] =
@@ -57,7 +59,7 @@ object Parser extends Parsers {
 
   private def functionDef: Parser[FunctionDef] =
     OPENPAREN() ~ functionDefToken ~ variableToken ~ expressionOrSpecialForm ~ CLOSEPAREN() ^^ {
-      case _ ~ FUNCTIONDEF() ~ VARIABLE(paramName) ~ body ~ _ => FunctionDef(VariableDefinition(paramName), body)
+      case _ ~ FUNCTIONDEF() ~ VARIABLE(paramName) ~ body ~ _ => FunctionDef(paramName, body)
     }
 
   private def list: Parser[ListType] =

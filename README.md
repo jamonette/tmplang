@@ -14,28 +14,27 @@
 
 ##### Tutorial
 
-This example demonstrates every single feature of the language. Plus modulo,
-which it doesn't actually have yet.
+This example demonstrates every single feature of the language.
 
 ```
-(let message-even "even"
-  (let message-odd "odd"
-    (let test-vals (list 0 1 2 3 4 5)
+(let message-0 "zero"
+  (let message-1 "not zero"
+    (let test-vals (list 0 1 2 0 4 5)
       (let demo-function
         (function-def input-values
           (let first-in-list (first (list input-values))
             (let rest-of-list (rest (list input-values))
               (let first-msg
-                (if (= (% first-in-list 2) 0)
-                  (list message-even)
-                  (list message-odd))
+                (if (= (list first-in-list 0))
+                  (list message-0)
+                  (list message-1))
                 (if (= (list rest-of-list ()))
                   first-msg
                   (let rest-msgs (function-call demo-function rest-of-list)
                     (concat (list first-msg rest-msgs))))))))
         (function-call demo-function test-vals)))))
 
-output: ("even", "odd", "even", "odd", "even", "odd")
+output: ("zero", "not zero", "not zero", "zero", "not zero", "not zero")
 ```
 
 ##### Frequently Asked Questions
@@ -47,6 +46,6 @@ That wasn't a question.
 
 ##### TODO
 
-* Add a REPL
-* Add support for globals
+`()`
+
 

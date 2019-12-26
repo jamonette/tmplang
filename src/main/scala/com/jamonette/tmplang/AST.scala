@@ -11,17 +11,15 @@ sealed trait Operator extends Expression
 
 case class FunctionCall(function: ExpressionOrSpecialForm, argument: ExpressionOrSpecialForm) extends SpecialForm
 case class If(condition: ExpressionOrSpecialForm, ifTrue: ExpressionOrSpecialForm, ifFalse: ExpressionOrSpecialForm) extends SpecialForm
-case class Let(variable: VariableDefinition, valueToBind: ExpressionOrSpecialForm, toEvaluate: ExpressionOrSpecialForm) extends SpecialForm
+case class Let(variableName: String, valueToBind: ExpressionOrSpecialForm, toEvaluate: ExpressionOrSpecialForm) extends SpecialForm
 case class OperatorCall(operator: Operator, list: ListOrReference) extends SpecialForm
 case class VariableReference(variableName: String) extends SpecialForm with ListOrReference
-
-case class VariableDefinition(variableName: String)
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 ///// Expression types ////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-case class FunctionDef(formalParameter: VariableDefinition, functionBody: ExpressionOrSpecialForm) extends Expression
+case class FunctionDef(formalParameterName: String, functionBody: ExpressionOrSpecialForm) extends Expression
 case class ListType(items: Seq[ExpressionOrSpecialFormOrReference]) extends Expression with ListOrReference
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +37,6 @@ case class False() extends BooleanValue
 ///// Numerical operators /////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-// NOTE: never add the modulo operator
 sealed trait NumericalOperator extends Operator
 case class Add() extends NumericalOperator
 case class Subtract() extends NumericalOperator

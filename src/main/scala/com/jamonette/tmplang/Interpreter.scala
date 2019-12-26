@@ -5,31 +5,16 @@ import cats.data.EitherT
 import cats.data.State
 import cats.implicits._
 
-sealed trait RuntimeError
-case class InterpreterError(msg: String) extends RuntimeError
-case class ReferenceError(msg: String) extends RuntimeError
-case class TypeError(msg: String) extends RuntimeError
-
-sealed trait Evaluated
-case class EvaluatedFunctionDef(functionDef: FunctionDef, lexicalEnvironment: Map[String, Evaluated]) extends Evaluated
-case class EvaluatedList(items: List[Evaluated]) extends Evaluated
-case class EvaluatedOperator(operator: Operator) extends Evaluated
-case class EvaluatedValue(value: Value) extends Evaluated
-
 object Interpreter {
 
-  type RuntimeStateMonad[A] = State[RuntimeEnvironment, A]
-  type RuntimeMonad[A] = EitherT[RuntimeStateMonad, RuntimeError, A]
+  private type RuntimeStateMonad[A] = State[RuntimeEnvironment, A]
+  private type RuntimeMonad[A] = EitherT[RuntimeStateMonad, RuntimeError, A]
 
   // In this implementation, each "stack frame" is actually a full
   // copy of the environment, meaning it contains all variables in scope
   // (plus any that have been closed over).
-  //
-  // Copies are super fast since Map is a persistent data structure,
-  // and this approach should be faster than searching up the stack on
-  // each deref.
 
-  case class RuntimeEnvironment(stack: Vector[Map[String, Evaluated]])
+  private case class RuntimeEnvironment(stack: Vector[Map[String, Evaluated]])
 
   def run(expression: ExpressionOrSpecialForm): Either[RuntimeError, Evaluated] = {
     val initialState = RuntimeEnvironment(Vector(Map()))
@@ -77,7 +62,7 @@ object Interpreter {
 
       // bind the function argument to a variable with
       // the name of the functions formal parameter
-      _ <- addToSymbolTable(evaluatedFunctionDef.functionDef.formalParameter.variableName, argumentValue)
+      _ <- addToSymbolTable(evaluatedFunctionDef.functionDef.formalParameterName, argumentValue)
 
       // evaluate the function body in the new environment
       result <- eval(evaluatedFunctionDef.functionDef.functionBody)
@@ -88,11 +73,11 @@ object Interpreter {
       _ <- EitherT.right(State.set(envWithPoppedStack))
     } yield result
 
-  // Store the current stack frame in the EvaluatedFunction.
+  // Store the current stack frame in the EvaluatedFunctionDef.
   //
   // Later, when the function is called, merge any variables stored in the
   // FunctionDef into the current environment so that they are resolved in
-  // preference to the stack at the call site. Allows for closures.
+  // preference to the stack at the call site. This allows for closures.
 
   private def evalFunctionDef(functionDef: FunctionDef): RuntimeMonad[Evaluated] =
     for {
@@ -126,7 +111,7 @@ object Interpreter {
   private def evalLetBinding(letBinding: Let): RuntimeMonad[Evaluated] =
     for {
       valueToBind <- eval(letBinding.valueToBind)
-      _ <- addToSymbolTable(letBinding.variable.variableName, valueToBind)
+      _ <- addToSymbolTable(letBinding.variableName, valueToBind)
       result <- eval(letBinding.toEvaluate)
     } yield result
 
